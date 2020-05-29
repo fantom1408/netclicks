@@ -12,25 +12,30 @@ const modal = document.querySelector('.modal');
 const tvShows = document.querySelector('.tv-shows');
 const tvCardImg = document.querySelector('.tv-card__img');
 const modalTitle = document.querySelector('.modal__title');
-const genreList = document.querySelector('.genres-list');
+const genresList = document.querySelector('.genres-list');
 const rating = document.querySelector('.rating');
 const description = document.querySelector('.description');
 const modalLink = document.querySelector('.modal__link');
 const searchForm = document.querySelector('.search__form');
 const searchFormInput = document.querySelector('.search__form-input');
 const preloader = document.querySelector('.preloader');
+const dropdown = document.querySelectorAll('.dropdown');
+const tvShowsHead = document.querySelector('.tv-shows__head');
+const posterWrapper = document.querySelector('.poster__wrapper');
+const modalContent = document.querySelector('.modal__content');
 
 const loading = document.createElement('div');
 loading.className = 'loading';
 
 
-DBService = class {
+class DBService {
 
     constructor(){
         this.SERVER = 'https://api.themoviedb.org/3';
         this.API_KEY = '2097eceedba965021905edcf0e4ae709';
     }
     getData = async (url) => {
+        tvShows.append(loading);
         const res = await fetch(url);
         if (res.ok){
             return res.json();
@@ -52,14 +57,34 @@ DBService = class {
         this.getData(`${this.SERVER}/search/tv?api_key=${this.API_KEY}&language=ru-RU&query=${query}`);
         
     getTvShow = id => this.getData(`${this.SERVER}/tv/${id}?api_key=${this.API_KEY}&language=ru-RU`);
+
+    getTopRated = () => this.getData(`${this.SERVER}/tv/top_rated?api_key=${this.API_KEY}&language=ru-RU`);
+
+    getPopular = () => this.getData(`${this.SERVER}/tv/popular?api_key=${this.API_KEY}&language=ru-RU`);
+
+    getToday = () => this.getData(`${this.SERVER}/tv/airing_today?api_key=${this.API_KEY}&language=ru-RU`);
+
+    getWeek = () => this.getData(`${this.SERVER}/tv/on_the_air?api_key=${this.API_KEY}&language=ru-RU`);
     
 }
+
+    const dbService = new DBService();
 // console.log(new DBService().getSearchResult('ooo'));
 
 
-const renderCard = response => {
-    console.log(response);
-    tvShowsList.textContent = '';
+const renderCard = (response, target) => {
+        tvShowsList.textContent = '';
+
+        console.log(response);
+        if (!response.total_results) {
+            loading.remove();
+            tvShowsHead.textContent = 'К сожалению, по вашему запросу ничего не найдено...';
+            tvShowsHead.style.color = 'red';
+            return;
+        };
+
+            tvShowsHead.textContent = target ? target.textContent : 'Результат поиска:';
+            tvShowsHead.style.color = 'orange';
 
                 //можно так написать
     response.results.forEach(item => {
@@ -110,7 +135,7 @@ searchForm.addEventListener('submit', event => {
     const value = searchFormInput.value.trim();
     if(value){
         tvShows.append(loading);
-        new DBService().getSearchResult(value).then(renderCard);
+        dbService.getSearchResult(value).then(renderCard);
     }
     searchFormInput.value = '';
     
@@ -125,15 +150,24 @@ searchForm.addEventListener('submit', event => {
 
 //открытие/закрытие меню
 
+const closeDropdown = () => {
+    dropdown.forEach(item => {
+        item.classList.remove('active');
+        // console.log(item);
+    })
+}
+
 hamburger.addEventListener('click', () => {
     leftMenu.classList.toggle('openMenu');
     hamburger.classList.toggle('open');
+    closeDropdown();
 });
 
 document.addEventListener('click', (event) => {
     if (!event.target.closest('.left-menu')) {
         leftMenu.classList.remove('openMenu');
         hamburger.classList.remove('open');
+        closeDropdown();
     }
 });
 
@@ -146,9 +180,30 @@ leftMenu.addEventListener('click', event => {
         leftMenu.classList.add('openMenu');
         hamburger.classList.add('open');
     }
-
-
+    if(target.closest('#top-rated')) {
+        dbService.getTopRated().then((response) => renderCard(response, target));
+        console.log('top-rated');
+        
+    }
+    if(target.closest('#popular')) {
+        dbService.getPopular().then((response) => renderCard(response, target));
+        console.log('popular');
+        
+    }
+    if(target.closest('#week')) {
+        dbService.getWeek().then((response) => renderCard(response, target));
+        console.log('week');
+        
+    }
+    if(target.closest('#today')) {
+        dbService.getToday().then((response) => renderCard(response, target));
+        console.log('today');
+        
+    }
+    
 });
+
+
 
 //открытие модального окна
 
@@ -163,29 +218,44 @@ tvShowsList.addEventListener('click', event => {
 
         preloader.style.display = 'block';
 
-        new DBService().getTvShow(card.id)
-        .then(data => {
+        dbService.getTvShow(card.id)
+        .then(({ 
+                poster_path: posterPath,
+                name: title,
+                genres,
+                vote_average: voteAverage,
+                overview,
+                homepage}) => {
             // console.log(data);
-            tvCardImg.src = IMG_URL + data.poster_path;
-            tvCardImg.alt = data.name;
-            modalTitle.textContent = data.name;
-            genreList.textContent = '';
-            data.genres.forEach(item => {
-                genreList.innerHTML += `<li>${item.name}</li>`;
-            })
+
+            if(posterPath){
+                tvCardImg.src = IMG_URL + posterPath;
+                tvCardImg.alt = title;
+                posterWrapper.style.display = '';
+                modalContent.style.paddingLeft = '';
+            }else{
+                posterWrapper.style.display = 'none';
+                modalContent.style.paddingLeft = '25px';
+            }
             
-            rating.textContent = data.vote_average;
-            description.textContent = data.overview;
-            modalLink.href = data.homepage;
+            modalTitle.textContent = title;
+            genresList.textContent = '';
+            genres.forEach(item => {
+                genresList.innerHTML += `<li>${item.name}</li>`;
+            });
+            rating.textContent = voteAverage;
+            description.textContent = overview;
+            modalLink.href = homepage;
 
         })
-            .then(() => {
+
+        .then(() => {
                 document.body.style.overflow = 'hidden';
                 modal.classList.remove('hide');
             })
-        .then(() => {
+        .finally(() => {
             preloader.style.display = '';
-        })
+        });
     }
     
 
