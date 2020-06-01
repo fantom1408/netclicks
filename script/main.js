@@ -1,4 +1,6 @@
 
+
+
 const IMG_URL = 'https://image.tmdb.org/t/p/w185_and_h278_bestv2';
 // const SERVER = 'https://api.themoviedb.org/3';
 // const API_KEY = '2097eceedba965021905edcf0e4ae709';
@@ -23,6 +25,9 @@ const dropdown = document.querySelectorAll('.dropdown');
 const tvShowsHead = document.querySelector('.tv-shows__head');
 const posterWrapper = document.querySelector('.poster__wrapper');
 const modalContent = document.querySelector('.modal__content');
+const pagination = document.querySelector('.pagination');
+
+
 
 const loading = document.createElement('div');
 loading.className = 'loading';
@@ -35,14 +40,14 @@ class DBService {
         this.API_KEY = '2097eceedba965021905edcf0e4ae709';
     }
     getData = async (url) => {
-        tvShows.append(loading);
+        // tvShows.append(loading);
         const res = await fetch(url);
         if (res.ok){
             return res.json();
         }else{
             throw new Error(`Не удалось получить данные по адресу ${url}`);
         }
-                
+            
     }
 
     getTestData = () => {
@@ -53,8 +58,14 @@ class DBService {
         return this.getData('card.json');
     }
 
-    getSearchResult = query => 
-        this.getData(`${this.SERVER}/search/tv?api_key=${this.API_KEY}&language=ru-RU&query=${query}`);
+    getSearchResult = query => {
+        this.temp = `${this.SERVER}/search/tv?api_key=${this.API_KEY}&language=ru-RU&query=${query}`;
+        return this.getData(this.temp);
+    }
+        
+    getNextPage = page => {
+        return this.getData(this.temp + '&page=' + page);
+    }
         
     getTvShow = id => this.getData(`${this.SERVER}/tv/${id}?api_key=${this.API_KEY}&language=ru-RU`);
 
@@ -75,6 +86,8 @@ class DBService {
 const renderCard = (response, target) => {
         tvShowsList.textContent = '';
 
+        
+
         console.log(response);
         if (!response.total_results) {
             loading.remove();
@@ -84,7 +97,7 @@ const renderCard = (response, target) => {
         };
 
             tvShowsHead.textContent = target ? target.textContent : 'Результат поиска:';
-            tvShowsHead.style.color = 'orange';
+            tvShowsHead.style.color = 'blue';
 
                 //можно так написать
     response.results.forEach(item => {
@@ -124,17 +137,23 @@ const renderCard = (response, target) => {
         `;
         loading.remove();
         tvShowsList.append(card);
-
-        
         
     });
+
+    pagination.textContent = '';
+
+    if(response.total_pages > 1) {
+        for (let i = 1; i <= response.total_pages; i++) {
+            pagination.innerHTML += `<li><a href="#" class="pages">${i}</a></li>`
+        }
+    }
 };
 
 searchForm.addEventListener('submit', event => {
     event.preventDefault();    
     const value = searchFormInput.value.trim();
     if(value){
-        tvShows.append(loading);
+        // tvShows.append(loading);
         dbService.getSearchResult(value).then(renderCard);
     }
     searchFormInput.value = '';
@@ -199,6 +218,11 @@ leftMenu.addEventListener('click', event => {
         dbService.getToday().then((response) => renderCard(response, target));
         console.log('today');
         
+    }
+
+    if (target.closest('#search')){
+        tvShowsList.textContent = '';
+        tvShowsHead.textContent = '';
     }
     
 });
@@ -298,4 +322,11 @@ const changeImage = event => {
 tvShowsList.addEventListener('mouseover', changeImage);
 tvShowsList.addEventListener('mouseout', changeImage);
 
-
+pagination.addEventListener ('click', event => {
+    event.preventDefault();
+    const target = event.target;
+    if(target.classList.contains('pages')) {
+        tvShows.append(loading);
+        dbService.getNextPage(target.textContent).then(renderCard);
+    }
+});
